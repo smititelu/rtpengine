@@ -911,38 +911,40 @@ fail:
 }
 
 /* puts a list of "struct intf_list" into "out", containing socket_t list */
-int get_consecutive_ports(GQueue *out, unsigned int num_ports, const struct logical_intf *log,
-		const str *label)
+int get_consecutive_ports(GQueue *out, unsigned int num_ports, struct call_media *media)
 {
 	GList *l;
 	struct intf_list *il;
 	const struct local_intf *loc;
+	const struct logical_intf *log = media->logical_intf;
+	const sockfamily_t *desired_family = media->desired_family;
+	const str *label = &media->call->callid;
 
 	for (l = log->list.head; l; l = l->next) {
 		loc = l->data;
 
-		il = g_slice_alloc0(sizeof(*il));
-		il->local_intf = loc;
-		g_queue_push_tail(out, il);
-		if (G_LIKELY(!__get_consecutive_ports(&il->list, num_ports, 0, loc->spec, label))) {
-			// success - found available ports on local interfaces, so far
+		// check desired family of local interface
+		if (strcmp(desired_family->rfc_name, loc->spec->local_address.addr.family->rfc_name) != 0)  {
+			ilog(LOG_DEBUG, "Did not find yet one local interface for family %s; continue...", desired_family->rfc_name);
 			continue;
 		}
 
-		// error - found at least one local interface with no ports available
-		goto error_ports;
+		ilog(LOG_DEBUG, "Found one local interface for family %s", desired_family->rfc_name);
+
+		il = g_slice_alloc0(sizeof(*il));
+		il->local_intf = loc;
+		if (G_LIKELY(!__get_consecutive_ports(&il->list, num_ports, 0, loc->spec, label))) {
+			// success - found available ports on one local interface
+			g_queue_push_tail(out, il);
+			return 0;
+		} else {
+			// fail - no available ports on one local interface... continue
+			free_socket_intf_list(il);
+		}
 	}
 
-	return 0;
-
-error_ports:
-	ilog(LOG_ERR, "Failed to get %d consecutive ports on all locals of logical '"STR_FORMAT"'",
+	ilog(LOG_ERR, "Failed to get %d consecutive ports on one local of logical '"STR_FORMAT"'",
 		num_ports, STR_FMT(&log->name));
-
-	// free all ports alloc'ed so far for the previous local interfaces
-	while ((il = g_queue_pop_head(out))) {
-		free_socket_intf_list(il);
-	}
 
 	return -1;
 }
