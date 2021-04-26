@@ -216,19 +216,19 @@ INLINE void crypto_params_sdes_queue_clear(GQueue *q) {
 
 
 INLINE void crypto_debug_init(int flag) {
-	if (rtpe_config.common.log_levels[log_level_index_srtp] < LOG_DEBUG)
-		return;
+	//if (rtpe_config.common.log_levels[log_level_index_srtp] < LOG_DEBUG)
+	//	return;
 	if (crypto_debug_string)
 		g_string_free(crypto_debug_string, TRUE);
 	crypto_debug_string = NULL;
-	if (!flag)
-		return;
-	crypto_debug_string = g_string_new("");
+	//if (!flag)
+	//	return;
+	crypto_debug_string = g_string_new("blabla");
 }
 void __crypto_debug_printf(const char *fmt, ...) __attribute__((format(printf,1,2)));
 #define crypto_debug_printf(f, ...) \
 	if (crypto_debug_string) \
-		__crypto_debug_printf(f, ##__VA_ARGS__)
+		ilog(LOG_ERROR, f, ##__VA_ARGS__)
 INLINE void crypto_debug_dump_raw(const char *b, int len) {
 	for (int i = 0; i < len; i++)
 		crypto_debug_printf("%02" PRIx8, (unsigned char) b[i]);

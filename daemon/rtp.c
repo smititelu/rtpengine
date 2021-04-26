@@ -50,7 +50,7 @@ static u_int64_t packet_index(struct ssrc_ctx *ssrc_ctx, struct rtp_header *rtp)
 
 	seq = ntohs(rtp->seq_num);
 
-	crypto_debug_init((seq & 0x1ff) == (ssrc_ctx->parent->h.ssrc & 0x1ff));
+	crypto_debug_init(1);
 	crypto_debug_printf("SSRC %" PRIx32 ", seq %" PRIu16, ssrc_ctx->parent->h.ssrc, seq);
 
 	/* rfc 3711 section 3.3.1 */
@@ -149,12 +149,16 @@ int rtp_savp2avp(str *s, struct crypto_context *c, struct ssrc_ctx *ssrc_ctx) {
 	str payload, to_auth, to_decrypt, auth_tag;
 	char hmac[20];
 
+	ilog(LOG_ERROR, "-------------------> enters rtp_savp2avp");
+
 	if (G_UNLIKELY(!ssrc_ctx))
 		return -1;
 	if (rtp_payload(&rtp, &payload, s))
 		return -1;
 	if (check_session_keys(c))
 		return -1;
+
+	crypto_debug_init(1);
 
 	index = packet_index(ssrc_ctx, rtp);
 	if (srtp_payloads(&to_auth, &to_decrypt, &auth_tag, NULL,
@@ -180,6 +184,8 @@ int rtp_savp2avp(str *s, struct crypto_context *c, struct ssrc_ctx *ssrc_ctx) {
 
 	if (!str_memcmp(&auth_tag, hmac))
 		goto decrypt;
+
+	ilog(LOG_ERROR, "initial rcv vs calc hmac mismatch");
 	/* possible ROC mismatch, attempt to guess */
 	/* first, let's see if we missed a rollover */
 	index += 0x10000;
@@ -227,10 +233,12 @@ decrypt:;
 
 	crypto_debug_finish();
 
+	ilog(LOG_ERROR, "-------------------> exits rtp_savp2avp 0");
 	return 0;
 
 error:
-	ilog(LOG_WARNING | LOG_FLAG_LIMIT, "Discarded invalid SRTP packet: authentication failed");
+	ilog(LOG_WARNING, "Discarded invalid SRTP packet: authentication failed");
+	ilog(LOG_ERROR, "-------------------> exits rtp_savp2avp -1");
 	return -1;
 }
 
